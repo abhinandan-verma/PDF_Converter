@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -61,11 +62,15 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
@@ -74,7 +79,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     ksp("androidx.hilt:hilt-navigation-compose:1.1.0")
     ksp("androidx.navigation:navigation-compose:2.7.6")
-    ksp("android.arch.lifecycle:viewmodel:1.1.1")
+    ksp("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // material ripple, morphing button, material dialog, animations
     implementation ("com.airbnb.android:lottie-compose:6.3.0")
@@ -86,6 +91,7 @@ dependencies {
     implementation ("com.burhanrashid52:photoeditor:3.0.1")
     implementation("com.vanniktech:android-image-cropper:4.5.0")
     implementation ("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
 
     // https://mvnrepository.com/artifact/org.apache.poi/poi
@@ -95,11 +101,17 @@ dependencies {
     //scanning qr code
     implementation ("com.github.yuriy-budiyev:code-scanner:2.3.0")
 
+    //android-pdf-viewer
+    implementation ("com.github.barteksc:android-pdf-viewer:2.8.2")
     // color-picker
     implementation("com.github.skydoves:colorpickerview:2.3.0")
 
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1") {
-        exclude("com.android.support")
-    }
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    // Dagger Hilt
+    implementation("com.google.dagger:hilt-android:2.50")
+    ksp("androidx.hilt:hilt-compiler:1.1.0")
+    ksp("com.google.dagger:hilt-android-compiler:2.50")
+    implementation("androidx.work:work-runtime:2.9.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
 
 }

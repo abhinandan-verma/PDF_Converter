@@ -1,4 +1,4 @@
-package com.abhicoding.pdfconverter
+package com.abhicoding.pdfconverter.welcomescreen
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
