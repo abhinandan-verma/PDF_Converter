@@ -10,8 +10,7 @@ import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
+import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.DisplayMetrics
@@ -21,11 +20,8 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
-import com.abhicoding.pdfconverter.R
 import com.abhicoding.pdfconverter.pdf.model.PdfData
-import com.abhicoding.pdfconverter.pdf.utils.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -52,29 +48,34 @@ class PdfViewModel @Inject constructor(private val application: Application) : V
     fun onEvent(event: PdfEvent) {
         when (event) {
             PdfEvent.GetPDF -> {
-                val folder = File(application.getExternalFilesDir(null), Constants.PDF_FOLDER)
-                if (folder.exists()) {
-                    val files = folder.listFiles()
-                    val list = arrayListOf<PdfData>()
-                    for (fileEntry in files!!) {
-                        val uri = Uri.fromFile(fileEntry)
-                        val pdfData = PdfData(fileEntry, uri)
+                val folder = application.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+                val pdfFiles = folder?.listFiles { file ->
+                    file.isFile && file.extension.equals(".pdf", ignoreCase = true)
+                }?.toList() ?: emptyList()
+                if (folder != null) {
+                    if (folder.exists()) {
+                        Log.d("msg","pdf retrieved from ${folder.absolutePath}")
+                        val files = folder.listFiles()
+                        val list = arrayListOf<PdfData>()
+                        for (fileEntry in files!!) {
+                            val uri = Uri.fromFile(fileEntry)
+                            val pdfData = PdfData(fileEntry, uri)
 
-                        list.add(pdfData)
+                            list.add(pdfData)
+                        }
+                        _getPdfEventFlow.value = list
+                    } else {
+                        Log.d("TAG", "loadPdfDocument: no Files in folder")
+                        Toast.makeText(application, "No Pdf File", Toast.LENGTH_SHORT).show()
                     }
-                    _getPdfEventFlow.value = list
-                } else {
-                    Log.d("msg", "loadPdfDocument: no files in folder")
-                    Toast.makeText(application, "No pdf File", Toast.LENGTH_SHORT).show()
                 }
             }
 
             is PdfEvent.CreatePDF -> {
                 try {
 
-                    val root = File(application.getExternalFilesDir(null), Constants.PDF_FOLDER)
-                    root.mkdir()
-                    Log.d("msg", "generatePdfFromImage; try")
+                    val root = application.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+                    Log.d("TAG", "generatePdfFromImages:  try")
 
                     val timestamp = System.currentTimeMillis()
                     val fileName = if (event.title.isNotEmpty()) {
@@ -88,6 +89,7 @@ class PdfViewModel @Inject constructor(private val application: Application) : V
                     val fileOutputStream = FileOutputStream(file)
                     val pdfDocument = PdfDocument()
 
+
                     for ((index, image) in event.imageList.withIndex()) {
                         try {
                             var bitmap = ImageDecoder.decodeBitmap(
@@ -97,29 +99,31 @@ class PdfViewModel @Inject constructor(private val application: Application) : V
                                 )
                             )
                             bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-
+                            Log.d("msg", "decoded Bimap $bitmap")
                             //Get the screen width
                             val displayMetrics = DisplayMetrics()
-                            (application.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
-                                .defaultDisplay.getMetrics(displayMetrics)
+                            (application.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getMetrics(
+                                displayMetrics
+                            )
+
 
                             val screenWidth = displayMetrics.widthPixels
 
-                            // calculate the new height to maintain the aspect ratio based on the screen width
 
+                            // Calculate the new height to maintain aspect ratio based on the screen width
                             val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
                             val newHeight = (screenWidth / aspectRatio).toInt()
 
                             // Resize the bitmap to have the screen width
                             bitmap = Bitmap.createScaledBitmap(bitmap, screenWidth, newHeight, true)
 
-                            val pageInfo = PdfDocument.PageInfo
-                                .Builder(bitmap.width, bitmap.height, index + 1).create()
+                            val pageInfo =
+                                PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1)
+                                    .create()
 
                             val page = pdfDocument.startPage(pageInfo)
                             val paint = Paint()
-
-                            paint.color = ContextCompat.getColor(application, R.color.white)
+                          //  paint.color = R.color.white
 
                             val canvas = page.canvas
                             canvas.drawPaint(paint)
@@ -127,6 +131,9 @@ class PdfViewModel @Inject constructor(private val application: Application) : V
 
                             pdfDocument.finishPage(page)
                             bitmap.recycle()
+
+
+
                         } catch (e: Exception) {
                             Log.d("error", "e: ${e.localizedMessage}")
                             e.printStackTrace()
@@ -172,7 +179,7 @@ class PdfViewModel @Inject constructor(private val application: Application) : V
         Log.d("msg", "loadThumbNailFromPdf: ")
         val executorService = Executors.newSingleThreadExecutor()
         var thumbNailBitmap : Bitmap? = null
-        val handler = Handler(Looper.getMainLooper())
+      //  val handler = Handler(Looper.getMainLooper())
         var pageCount = 0
 
         executorService.execute{

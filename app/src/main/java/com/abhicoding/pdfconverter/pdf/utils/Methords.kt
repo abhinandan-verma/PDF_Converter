@@ -1,15 +1,14 @@
 package com.abhicoding.pdfconverter.pdf.utils
 
-import java.text.DateFormat
+import android.text.format.DateFormat
 import java.util.Calendar
 import java.util.Locale
 
 object Methords {
     fun formatTimeStamp(timeStamp: Long): String {
-        val calendar = Calendar.getInstance(Locale.US)
+        val calendar = Calendar.getInstance(Locale.ENGLISH)
         calendar.timeInMillis = timeStamp
 
-       return  DateFormat.getInstance().format("dd/MM/yyyy").toString()
-
+        return DateFormat.format("dd/MM/yyyy",calendar).toString()
     }
 }

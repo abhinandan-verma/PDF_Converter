@@ -84,6 +84,7 @@ dependencies {
     // material ripple, morphing button, material dialog, animations
     implementation ("com.airbnb.android:lottie-compose:6.3.0")
     implementation ("com.squareup.picasso:picasso:2.8")
+    implementation("com.google.android.material:material:1.11.0")
 
     // https://mvnrepository.com/artifact/com.itextpdf/itext7-core
     implementation("com.itextpdf:itext7-core:8.0.2")
@@ -102,7 +103,8 @@ dependencies {
     implementation ("com.github.yuriy-budiyev:code-scanner:2.3.0")
 
     //android-pdf-viewer
-    implementation ("com.github.barteksc:android-pdf-viewer:2.8.2")
+    implementation ("com.github.barteksc:android-pdf-viewer:3.2.0-beta.1")
+    implementation ("com.github.afreakyelf:Pdf-Viewer:2.0.5")
     // color-picker
     implementation("com.github.skydoves:colorpickerview:2.3.0")
 

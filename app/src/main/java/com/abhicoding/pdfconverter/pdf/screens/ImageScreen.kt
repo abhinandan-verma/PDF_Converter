@@ -1,13 +1,8 @@
 package com.abhicoding.pdfconverter.pdf.screens
 
-import android.content.ContentResolver
-import android.content.ContentValues
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,6 +12,7 @@ import androidx.activity.result.launch
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,14 +24,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -53,12 +51,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,11 +67,11 @@ import com.abhicoding.pdfconverter.R
 import com.abhicoding.pdfconverter.pdf.PdfEvent
 import com.abhicoding.pdfconverter.pdf.PdfViewModel
 import com.abhicoding.pdfconverter.pdf.model.ImageData
+import com.canhub.cropper.CropImageContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.OutputStream
 
 @RequiresApi(Build.VERSION_CODES.R)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,37 +79,25 @@ import java.io.OutputStream
 fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
 
     val context = LocalContext.current
-    var imageList by remember {
-        mutableStateOf(emptyList<ImageData>())
-    }
-    var showPopMenu by remember {
-        mutableStateOf(false)
-    }
-    var update by remember {
-        mutableStateOf(false)
-    }
-    var loading by remember {
-        mutableStateOf(false)
-    }
-    var save by remember {
-        mutableStateOf(false)
-    }
-    var title by remember {
-        mutableStateOf("")
-    }
+    var imageList by remember { mutableStateOf(emptyList<ImageData>()) }
+    var update by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    var save by remember { mutableStateOf(false) }
+    var title by remember { mutableStateOf("") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(),
-        onResult = { uris ->
-            Log.d("tag", "ImageScreen: uri $uris")
-            val list = arrayListOf<ImageData>()
-            list.addAll(imageList)
-            uris.forEach { uri ->
-                list.add(ImageData(uri, false))
-            }
-            imageList = list
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        Log.d("tag", "ImageScreen: uri $uris")
+        val list = arrayListOf<ImageData>()
+        list.addAll(imageList)
+        uris.forEach { uri ->
+            list.add(ImageData(uri, false))
         }
-    )
+        imageList = list
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview(),
@@ -130,15 +116,23 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
     )
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = {
-            if (it) {
-                Toast.makeText(context, "Permission Granted", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
-            }
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        if (it) {
+            Toast.makeText(context, "Permission Granted", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
         }
-    )
+    }
+    val imageCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            imageUri = result.uriContent
+        } else {
+            val exception = result.error
+            Log.e("error", exception.toString())
+        }
+    }
+
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -147,24 +141,95 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    showPopMenu = true
-                },
-                containerColor = Color.Green
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Image"
-                )
+
+           Column (
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Bottom,
+               modifier = Modifier.padding(bottom = 10.dp)
+            ){
+                FloatingActionButton(
+                    onClick = {
+                        val permissionCheckResult =
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.CAMERA
+                            )
+                        if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
+                            cameraLauncher.launch()
+                        } else {
+                            permissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        }
+                    },
+                    containerColor = Color.Magenta,
+                    shape = CircleShape,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.camera),
+                        contentDescription = "addPdf",
+                        tint = Color.White,
+                        modifier = Modifier.padding(8.dp).size(40.dp)
+                    )
+                }
+                FloatingActionButton(
+                    onClick = {
+                        val permissionCheckResult =
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.READ_EXTERNAL_STORAGE
+                            ) // READ_MEDIA_IMAGES for latest
+                        if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        } else {
+                            permissionLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE) // READ_MEDIA_IMAGES for latest
+                        }
+                    },
+                    shape = CircleShape,
+                    containerColor = Color.Cyan,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.gallery),
+                        contentDescription = "addPdf",
+                        tint = Color.Black,
+                        modifier = Modifier.padding(8.dp).size(40.dp)
+                    )
+                }
+               FloatingActionButton(
+                   onClick = {
+                       Log.d("msg", "ImageScreen: IconButton onClick")
+                       if (imageList.isEmpty()) {
+                           Toast.makeText(context, "No Image Selected", Toast.LENGTH_SHORT).show()
+                       } else {
+                           save = true
+                       }
+                   },
+                   shape = CircleShape,
+                   containerColor = Color.Green,
+                   modifier = Modifier.size(55.dp)
+               ) {
+                   Icon(
+                       painter = painterResource(id = R.drawable.pic2),
+                       contentDescription = "addPdf",
+                       tint = Color.Black
+                   )
+               }
+
             }
         },
         topBar = {
             TopAppBar(
-                title = { Text(text = "Image Screen",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )},
+                title = {
+                    Text(
+                        text = "Image Screen",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = {
                         navHostController.navigateUp()
@@ -172,7 +237,8 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = Color.Green
                         )
                     }
                 },
@@ -189,7 +255,7 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
                         Icon(
                             painter = painterResource(id = R.drawable.pic2),
                             contentDescription = "PDF",
-                            modifier = Modifier.background(color = Color.White)
+                            tint = Color.Cyan
                         )
                     }
                     IconButton(onClick = {
@@ -213,7 +279,8 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
                     }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete"
+                            contentDescription = "Delete",
+                            tint = Color.Red
                         )
                     }
                     IconButton(onClick = {
@@ -222,7 +289,8 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
                     }) {
                         Icon(
                             imageVector = Icons.Default.Clear,
-                            contentDescription = "Delete All"
+                            contentDescription = "Delete All",
+                            tint = Color.Magenta
                         )
                     }
                 },
@@ -244,33 +312,31 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
                     onDismissListener = {
                         save = false
                         loading = false
-                    },
-                    onSavaClickedListener = {
-                        loading = true
-                        save = false
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val list = arrayListOf<ImageData>()
-                            imageList.forEach { imageData ->
-                                if (imageData.checked) {
-                                    list.add(imageData)
-                                }
-                            }
-                            if (list.size != 0) {
-                                imageList = list
-                            }
-
-                            viewModel.onEvent(PdfEvent.CreatePDF(title, imageList) {
-
-                            })
-
-                            withContext(Dispatchers.Main) {
-                                loading = false
-                                Toast.makeText(context, "PDF Converted", Toast.LENGTH_SHORT).show()
-                                navHostController.navigateUp()
+                    }
+                ) {
+                    loading = true
+                    save = false
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val list = arrayListOf<ImageData>()
+                        imageList.forEach { imageData ->
+                            if (imageData.checked) {
+                                list.add(imageData)
                             }
                         }
+                        if (list.size != 0) {
+                            imageList = list
+                        }
+                        viewModel.onEvent(PdfEvent.CreatePDF(title, imageList) { })
+                        Log.d("msg", "pdf Created")
+
+                        withContext(Dispatchers.Main) {
+                            loading = false
+                            Toast.makeText(context, "PDF Converted", Toast.LENGTH_SHORT).show()
+                            Log.d("msg", "going to main screen")
+                            navHostController.navigateUp()
+                        }
                     }
-                )
+                }
             }
         }
         if (loading) {
@@ -287,51 +353,15 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
             }
         }
 
-        if (showPopMenu) {
-            ShowPopUpMenu(onCameraClicked = {
-                showPopMenu = false
-                val permissionCheckResult =
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        android.Manifest.permission.CAMERA
-                    )
-                if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
-                    cameraLauncher.launch()
-                } else {
-                    permissionLauncher.launch(android.Manifest.permission.CAMERA)
-                }
-            },
-                onGalleryClicked = {
-                    showPopMenu = false
-                    val permissionCheckResult =
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            android.Manifest.permission.READ_MEDIA_IMAGES
-                        ) // READ_MEDIA_IMAGES for latest
-                    if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
-                        galleryLauncher.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    } else {
-                        permissionLauncher.launch(android.Manifest.permission.READ_MEDIA_IMAGES) // READ_MEDIA_IMAGES for latest
-                    }
-                },
-                onDismissListener = {
-                    showPopMenu = false
-                }
-            )
-        }
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 50.dp)
         ) {
             items(imageList) { imageData ->
                 SelectedBox(
-                    update,
-                    modifier = Modifier,
                     imageData,
                     selected = imageData.checked
                 ) {
@@ -348,29 +378,46 @@ fun ImageScreen(navHostController: NavHostController, viewModel: PdfViewModel) {
 
 @Composable
 fun SelectedBox(
-    update: Boolean,
-    modifier: Modifier,
     imageData: ImageData,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     Log.d("msg", "SelectedBox: box created ")
 
-    Box(modifier = Modifier
+    Box(
+        modifier = Modifier
         .width(200.dp)
         .height(150.dp)
+        .padding(12.dp)
+        .clip(shape = RoundedCornerShape(25.dp))
         .clickable {
             onClick()
-        }
+        },
+
     ) {
-        AsyncImage(
-            model = imageData.imageUri,
-            contentDescription = null,
-            Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            contentScale = ContentScale.Fit
-        )
+        Card(
+            shape = RoundedCornerShape(15.dp),
+            elevation = CardDefaults.cardElevation(10.dp),
+            modifier = Modifier
+                .background(Color.Cyan)
+                .padding(12.dp)
+
+        ) {
+            AsyncImage(
+                model = imageData.imageUri,
+                contentDescription = null,
+                Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                contentScale = ContentScale.FillBounds
+            )
+            Text(
+                text = imageData.imageUri.toString(),
+                modifier = Modifier.background(Color.LightGray),
+                color = Color.Black
+            )
+        }
+
         if (selected) {
             Box(
                 modifier = Modifier
@@ -383,108 +430,26 @@ fun SelectedBox(
 }
 
 @Composable
-fun ShowPopUpMenu(
-    onCameraClicked: () -> Unit,
-    onGalleryClicked: () -> Unit,
-    onDismissListener: () -> Unit
-) {
-    Box {
-        AlertDialog(
-            title = {
-                Text(
-                    text = "Choose From...",
-                    style = TextStyle(
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                )
-            },
-            onDismissRequest = { onDismissListener() },
-            dismissButton = {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onCameraClicked,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow)
-                ) {
-                    Text(
-                        text = "Open Camera",
-                        style = TextStyle(
-                            fontSize = 16.sp,
-                            color = Color.Black
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onGalleryClicked,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow)
-                ) {
-                    Text(
-                        text = "Open Gallery",
-                        fontSize = 16.sp,
-                        color = Color.Black
-                    )
-                }
-            },
-        )
-    }
-
-}
-
-fun saveBitMapToMediaStore(context: Context, bitmap: Bitmap): Uri? {
-    val contentResolver: ContentResolver = context.contentResolver
-    val contentValues = ContentValues()
-    contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "my_image.jpeg")
-    contentValues.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-
-    val imageUri =
-        contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-    try {
-        if (imageUri != null) {
-            val outputStream: OutputStream? = contentResolver.openOutputStream(imageUri)
-            if (outputStream != null) {
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-                outputStream.flush()
-                outputStream.close()
-            }
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        return null
-    }
-    return imageUri
-}
-
-
-@Composable
 fun PdfSaveDialog(
-    title: String,
+    name: String,
     onNameChanged: (String) -> Unit,
     onDismissListener: () -> Unit,
-    onSavaClickedListener: () -> Unit
+    onSaveClickedListener: () -> Unit
 ) {
     AlertDialog(
         title = {
             Text(text = "Details")
         },
         text = {
-            OutlinedTextField(value = title,
-                onValueChange = onNameChanged,
-                placeholder = {
-                    Text(text = "Pdf Title")
-                })
+            OutlinedTextField(value = name, onValueChange = onNameChanged, placeholder = {
+                Text(text = "Pdf Title")
+            })
         },
         onDismissRequest = onDismissListener,
         confirmButton = {
-            Button(
-                onClick = onSavaClickedListener,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = "Convert To pdf")
+            Button(onClick = onSaveClickedListener, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Convert to pdf ")
             }
-        })
-
+        }
+    )
 }

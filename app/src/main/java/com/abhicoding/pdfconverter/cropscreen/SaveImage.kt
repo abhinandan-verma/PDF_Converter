@@ -8,15 +8,6 @@ import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
 
-fun saveImage(uri: Uri, context: Context){
-   // val cropImageContractOptions = cropBitmap(uri)
-    val bitmap = uri.asBitmap(context)
-    val outputStream = context.contentResolver.openOutputStream(uri)
-    bitmap.compress(Bitmap.CompressFormat.JPEG,100,outputStream!!)
-    outputStream.flush()
-    outputStream.close()
-}
-
 fun cropBitmap(uri: Uri): CropImageContractOptions {
 val cropOptions = CropImageOptions()
     cropOptions.apply {

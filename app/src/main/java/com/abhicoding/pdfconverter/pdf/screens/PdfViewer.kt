@@ -1,5 +1,6 @@
 package com.abhicoding.pdfconverter.pdf.screens
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import androidx.navigation.NavHostController
@@ -71,7 +73,8 @@ fun PdfViewer(navHostController: NavHostController, viewModel: PdfViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = pdf!!.file.name)
+                    Text(text = pdf!!.file.name,
+                        fontSize = 17.sp)
                 },
                 navigationIcon = {
                     IconButton(onClick = {
@@ -84,8 +87,14 @@ fun PdfViewer(navHostController: NavHostController, viewModel: PdfViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = {}) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Share")
+                    IconButton(onClick = {
+                        if (pdf != null) {
+                            sharePdf(pdf.file, context)
+                        }
+                    }) {
+                        Icon(imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = Color.Green)
                     }
                     IconButton(onClick = {
                         viewModel.onEvent(PdfEvent.DeletePDF(pdf!!) { delete ->
@@ -100,7 +109,8 @@ fun PdfViewer(navHostController: NavHostController, viewModel: PdfViewModel) {
                     }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete"
+                            contentDescription = "Delete",
+                            tint = Color.Red
                         )
                     }
                 },
@@ -111,14 +121,33 @@ fun PdfViewer(navHostController: NavHostController, viewModel: PdfViewModel) {
         Column(modifier = Modifier.padding(paddingValues)) {
 
             if (pdf != null) {
-                PdfView(pdf.file)
+             PdfView(pdf.file)
+
+                /* Parameters:
+- path: File path or URI of the local PDF.
+- fromAssets: Set to true when loading from assets.
+*/
+               /* PdfViewerActivity.launchPdfFromPath(
+                    context = context,
+                    path = pdf.uri.toString(),
+                    pdfTitle = pdf.file.name,
+                    fromAssets = true,
+                    saveTo = saveTo.ASK_EVERYTIME
+                )
+                PdfRendererViewCompose(
+                    url = pdf.uri.toString(),
+                    lifecycleOwner = LocalLifecycleOwner.current,
+                    file = pdf.file
+                )*/
+
             } else {
                 Toast.makeText(context, "null", Toast.LENGTH_SHORT).show()
             }
             if (share) {
-                SharePdfButton(pdf!!.uri, onButtonClick = {
-                    share = true
-                })
+                if (pdf != null) {
+                    SharePdf(pdfFile = pdf.file)
+                }
+
             }
         }
 
@@ -146,6 +175,14 @@ fun PdfView(pdfFile: File) {
             .enableSwipe(true)
             .swipeHorizontal(false)
             .enableDoubletap(true)
+            .autoSpacing(true)
+            .fitEachPage(true)
+            .linkHandler {
+
+            }
+            .onError {
+                Toast.makeText(context,"Something went Wrong ",Toast.LENGTH_SHORT).show()
+            }
             .onLoad { numberOfPages ->
                 pageCount = numberOfPages
             }
@@ -190,7 +227,7 @@ fun SharePdfButton(pdfUri: Uri, onButtonClick: () -> Unit) {
     val shareLauncher = remember {
         activity?.registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
-        ) { _ ->
+        ) {
             // Handle the result if needed
         }
     }
@@ -202,6 +239,7 @@ fun SharePdfButton(pdfUri: Uri, onButtonClick: () -> Unit) {
             intent.type = "application/pdf"
             intent.putExtra(Intent.EXTRA_STREAM, pdfUri)
             shareLauncher?.launch(Intent.createChooser(intent, "Share PDF"))
+
         },
         modifier = Modifier.padding(16.dp)
     ) {
@@ -212,7 +250,7 @@ fun SharePdfButton(pdfUri: Uri, onButtonClick: () -> Unit) {
 @Composable
 fun SharePdf(pdfFile: File) {
     val context = LocalContext.current
-    val contentUri = FileProvider
+    FileProvider
         .getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
 
     val sharePdfLauncher =
@@ -238,5 +276,17 @@ fun SharePdf(pdfFile: File) {
             Text(text = "Share PDF")
         }
     }
+}
+
+private fun sharePdf(pdfFile: File, context: Context) {
+
+
+    val uri2 = FileProvider.getUriForFile(context, context.applicationContext.packageName + ".provider", pdfFile)
+    val shareIntent2 = Intent(Intent.ACTION_SEND)
+    shareIntent2.type = "application/pdf"
+    shareIntent2.putExtra(Intent.EXTRA_STREAM, uri2)
+    shareIntent2.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(shareIntent2, "Share PDF"))
+
 }
 
